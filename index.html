@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGIS Infrastruktur Surakarta</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #38bdf8;
+            --border-color: #334155;
+            
+            /* Layer colors */
+            --color-edu: #22c55e;
+            --color-emerg: #ef4444;
+            --color-gov: #a855f7;
+            --color-trans: #eab308;
+            --color-bound: #00ffff;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+        }
+
+        #sidebar {
+            width: 30%;
+            min-width: 320px;
+            max-width: 450px;
+            background-color: var(--panel-bg);
+            padding: 2.5rem 2rem;
+            box-sizing: border-box;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-color);
+            z-index: 1000; /* Above the map */
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+        }
+
+        #map-container {
+            flex-grow: 1;
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+
+        #map {
+            width: 100vw;
+            height: 100vh;
+            background-color: #0b1120; /* Dark map background before tiles load */
+        }
+
+        h1 {
+            color: var(--text-color);
+            margin-top: 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+        }
+        
+        .title-highlight {
+            color: var(--accent-color);
+        }
+
+        p {
+            line-height: 1.6;
+            color: var(--text-muted);
+            text-align: justify;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .legend-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 2rem;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+
+        .legend-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 12px;
+            display: inline-block;
+        }
+        
+        .legend-bound {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--color-bound);
+            border-radius: 2px;
+            margin-right: 12px;
+            display: inline-block;
+            box-sizing: border-box;
+        }
+
+        /* Leaflet Dark Mode Adjustments */
+        .leaflet-tile-pane {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+
+        /* Dark mode controls */
+        .leaflet-bar a {
+            background-color: var(--panel-bg) !important;
+            color: var(--text-color) !important;
+            border-color: var(--border-color) !important;
+        }
+        .leaflet-bar a:hover {
+            background-color: #334155 !important;
+        }
+        
+        .leaflet-control-layers {
+            background-color: var(--panel-bg) !important;
+            color: var(--text-color) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
+            padding: 4px !important;
+        }
+        
+        .leaflet-control-layers-list {
+            padding: 4px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+        }
+        
+        .leaflet-control-attribution {
+            background-color: rgba(30, 41, 59, 0.8) !important;
+            color: var(--text-muted) !important;
+        }
+        .leaflet-control-attribution a {
+            color: var(--accent-color) !important;
+        }
+
+        /* Popup Styling */
+        .leaflet-popup-content-wrapper {
+            background-color: var(--panel-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            padding: 0;
+        }
+
+        .leaflet-popup-tip {
+            background-color: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+            border-left: 1px solid var(--border-color);
+        }
+
+        .leaflet-popup-content {
+            margin: 0 !important;
+            width: max-content !important;
+            min-width: 220px;
+            max-width: 350px;
+        }
+        
+        .popup-header {
+            background-color: rgba(15, 23, 42, 0.8);
+            padding: 12px 16px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        /* Popup Table Styles */
+        .popup-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .popup-table th, .popup-table td {
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 16px;
+            text-align: left;
+        }
+
+        .popup-table tr:last-child th,
+        .popup-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .popup-table th {
+            color: var(--text-muted);
+            font-weight: 500;
+            white-space: nowrap;
+            width: 40%;
+            background-color: rgba(255,255,255,0.02);
+        }
+
+        .popup-table td {
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        /* Custom marker icon CSS */
+        .custom-div-icon {
+            background: none;
+            border: none;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--accent-color);
+            z-index: 2000;
+            background: var(--panel-bg);
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            font-weight: 600;
+            display: none;
+        }
+
+        /* Custom Checkbox in Layer Control */
+        .leaflet-control-layers-selector {
+            accent-color: var(--accent-color);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h1>WebGIS Infrastruktur <br><span class="title-highlight">Surakarta</span></h1>
+        <p>Surakarta, often known as Solo, is a historically and culturally rich city in Central Java, Indonesia. As the heir to the Mataram Kingdom, it boasts significant heritage sites, traditional arts, and vibrant markets.</p>
+        <p>This WebGIS platform provides an overview of the city's essential infrastructure. Explore the interactive map to understand the spatial distribution of these critical assets within the city boundaries.</p>
+        
+        <ul class="legend-list">
+            <li class="legend-item">
+                <span class="legend-bound"></span>
+                City Boundary
+            </li>
+            <li class="legend-item">
+                <span class="legend-color" style="background-color: var(--color-edu);"></span>
+                Educational Institutions
+            </li>
+            <li class="legend-item">
+                <span class="legend-color" style="background-color: var(--color-emerg);"></span>
+                Emergency Services
+            </li>
+            <li class="legend-item">
+                <span class="legend-color" style="background-color: var(--color-gov);"></span>
+                Government Facilities
+            </li>
+            <li class="legend-item">
+                <span class="legend-color" style="background-color: var(--color-trans);"></span>
+                Transportation Hubs
+            </li>
+        </ul>
+
+        <div style="margin-top: auto; padding-top: 2rem; font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+            Use the layer control in the top-right corner to toggle visibility of different infrastructure points.
+        </div>
+    </div>
+
+    <div id="map-container">
+        <div id="loading" class="loading">Loading Map Data...</div>
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <script>
+        // Initialize Map
+        const map = L.map('map', {
+            zoomControl: false // Custom placement
+        }).setView([-7.5666, 110.8166], 13);
+        
+        L.control.zoom({
+            position: 'bottomright'
+        }).addTo(map);
+
+        // OpenStreetMap Basemap
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Dynamic Popup Generator
+        function createPopupContent(properties, title="Feature Details") {
+            if (!properties || Object.keys(properties).length === 0) return '<div style="padding: 16px;">No details available</div>';
+            
+            // Extract a name for the header if available
+            const featureName = properties.Name || properties.name || properties.Nama || properties.nama || title;
+            
+            let html = `<div class="popup-header">${featureName}</div>`;
+            html += '<table class="popup-table"><tbody>';
+            
+            for (const [key, value] of Object.entries(properties)) {
+                // Skip the name since it's in the header
+                if (key.toLowerCase() === 'name' || key.toLowerCase() === 'nama') continue;
+                html += `<tr><th>${key}</th><td>${value || '-'}</td></tr>`;
+            }
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // SVG Marker Generator for dynamic coloring
+        const createSvgIcon = (color) => {
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32px" height="32px">
+                    <path fill="${color}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>`;
+            return L.divIcon({
+                className: 'custom-div-icon',
+                html: svg,
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
+            });
+        };
+
+        const overlays = {};
+        const loadingEl = document.getElementById('loading');
+
+        async function loadGeoJSON(url, options) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Failed to load ${url} (Status: ${response.status})`);
+                }
+                const data = await response.json();
+                
+                const geojsonLayer = L.geoJSON(data, {
+                    style: options.style,
+                    pointToLayer: function (feature, latlng) {
+                        return L.marker(latlng, { icon: createSvgIcon(options.color) });
+                    },
+                    onEachFeature: function (feature, layer) {
+                        layer.bindPopup(createPopupContent(feature.properties, options.title));
+                    }
+                });
+
+                if (options.isBoundary) {
+                    geojsonLayer.addTo(map);
+                    // Add delay to ensure tiles load before fitting bounds
+                    setTimeout(() => map.fitBounds(geojsonLayer.getBounds(), { padding: [50, 50] }), 100);
+                } else {
+                    overlays[options.name] = geojsonLayer;
+                    geojsonLayer.addTo(map);
+                }
+            } catch (error) {
+                console.warn(`Could not load GeoJSON layer: ${error.message}`);
+            }
+        }
+
+        async function initData() {
+            loadingEl.style.display = 'block';
+            
+            // Neon cyan boundary with transparent fill
+            const boundaryStyle = {
+                color: 'var(--color-bound)',
+                weight: 3,
+                opacity: 0.8,
+                fillOpacity: 0
+            };
+
+            // Colors matching our CSS variables
+            const colorEdu = getComputedStyle(document.documentElement).getPropertyValue('--color-edu').trim();
+            const colorEmerg = getComputedStyle(document.documentElement).getPropertyValue('--color-emerg').trim();
+            const colorGov = getComputedStyle(document.documentElement).getPropertyValue('--color-gov').trim();
+            const colorTrans = getComputedStyle(document.documentElement).getPropertyValue('--color-trans').trim();
+
+            await Promise.all([
+                loadGeoJSON('data/boundary.geojson', { isBoundary: true, style: boundaryStyle }),
+                loadGeoJSON('data/education.geojson', { 
+                    name: `<span style="color:${colorEdu}; margin-right:5px;">●</span> Education`, 
+                    color: colorEdu,
+                    title: 'Educational Institution'
+                }),
+                loadGeoJSON('data/emergency.geojson', { 
+                    name: `<span style="color:${colorEmerg}; margin-right:5px;">●</span> Emergency`, 
+                    color: colorEmerg,
+                    title: 'Emergency Service'
+                }),
+                loadGeoJSON('data/government.geojson', { 
+                    name: `<span style="color:${colorGov}; margin-right:5px;">●</span> Government`, 
+                    color: colorGov,
+                    title: 'Government Facility'
+                }),
+                loadGeoJSON('data/transportation.geojson', { 
+                    name: `<span style="color:${colorTrans}; margin-right:5px;">●</span> Transportation`, 
+                    color: colorTrans,
+                    title: 'Transportation Hub'
+                })
+            ]);
+
+            // Add Layer Control
+            if (Object.keys(overlays).length > 0) {
+                L.control.layers(null, overlays, { 
+                    collapsed: false,
+                    position: 'topright'
+                }).addTo(map);
+            }
+            
+            loadingEl.style.display = 'none';
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', initData);
+
+    </script>
+</body>
+</html>
